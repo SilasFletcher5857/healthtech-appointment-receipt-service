@@ -1,0 +1,20 @@
+{
+  "name": "healthtech-appointment-receipt-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/receipt_service.ts",
+    "demo": "tsx scripts/send_sample_receipt.ts",
+    "test": "node --experimental-strip-types --test test/receipt_sender.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
