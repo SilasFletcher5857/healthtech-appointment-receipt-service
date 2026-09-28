@@ -45,14 +45,13 @@ export function createInfraiClient(options?: {
   const fetchImpl = options?.fetchImpl ?? fetch;
   const sleep = options?.sleep ?? ((milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
 
-  async function post<T>(path: string, payload: unknown, idempotencyKey: string): Promise<T> {
+  async function post<T>(path: string, payload: unknown): Promise<T> {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const response = await fetchImpl(`${baseUrl}${path}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify(payload),
       });
@@ -86,13 +85,13 @@ export function createInfraiClient(options?: {
   return {
     pdf: {
       generate: (payload: { html: string; page_size: string; orientation: string; store: boolean }, idempotencyKey: string) =>
-        post<PdfResult>("/v1/pdf/generate", payload, idempotencyKey),
+        post<PdfResult>("/v1/pdf/generate", { ...payload, idempotency_key: idempotencyKey }),
     },
     email: {
       send: (
         payload: { to: string; subject: string; html: string; attachments: Array<{ filename: string; url: string }> },
         idempotencyKey: string,
-      ) => post<EmailResult>("/v1/email/send", payload, idempotencyKey),
+      ) => post<EmailResult>("/v1/email/send", { ...payload, idempotency_key: idempotencyKey }),
     },
   };
 }

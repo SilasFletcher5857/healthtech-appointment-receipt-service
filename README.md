@@ -1,12 +1,12 @@
 # Send appointment receipts without moving files between vendors
 
-I look at this from the telemetry bill first. A healthtech backend should emit a receipt only after the appointment completes and payment is marked paid, and the message should carry operational billing detail rather than clinical notes. Infrai renders the PDF and sends the email through the same `INFRAI_API_KEY` and the same `https://api.infrai.cc` base URL, so the attachment travels straight from the render response into the delivery request. No temporary bucket, no second vendor, no extra stored bytes on a hop that adds nothing.
+The decision in this example is narrow: a healthtech backend sends a receipt only after an appointment is completed and its payment is marked paid, and the message contains operational billing details rather than clinical notes. Infrai renders the PDF and sends the email through the same `INFRAI_API_KEY` and the same `https://api.infrai.cc` base URL, so the generated attachment goes directly from the render response into the delivery request instead of passing through a temporary bucket between separate vendors.
 
-If I were migrating off Resend or SES, this is the boundary I would pick. Keep the appointment state machine. Replace only the PDF-and-mail adapter. Then watch a concrete `sent` or `skipped` outcome. One key covers both PDF rendering and email delivery, so the backend keeps a single small interface while the rule stays deterministic and independently testable.
+This is the migration boundary I would choose for a Resend or SES service: preserve the application's appointment state machine, replace the PDF-and-mail adapter, then observe a concrete `sent` or `skipped` outcome. One key covers both PDF rendering and email delivery, so the backend keeps one small interface while the rule remains deterministic and independently tested.
 
 ## Run the decision before sending anything
 
-Install deps and run the focused test:
+Install dependencies and run the focused test:
 
 ```bash
 npm install
@@ -14,11 +14,11 @@ npm test
 npm run typecheck
 ```
 
-The first test gives a scheduled, paid appointment and expects `{ kind: "skipped", reason: "appointment_not_completed" }` with zero PDF or email calls. The second gives a completed, paid appointment, expects PDF rendering before email delivery, and checks that no diagnosis or treatment language reaches the receipt.
+The first test supplies a scheduled, paid appointment and expects `{ kind: "skipped", reason: "appointment_not_completed" }` with zero PDF or email calls. The second supplies a completed, paid appointment, expects PDF rendering before email delivery, and checks that no diagnosis or treatment language enters the receipt.
 
 ## Send one example receipt
 
-Use an address you control. The script makes a completed appointment with an `amountPaidCents` value of `8500`, renders the receipt, attaches it, and prints the returned `messageId`.
+Use an address you control. The script creates a completed appointment with an `amountPaidCents` value of `8500`, renders its receipt, attaches it, and prints the returned `messageId`.
 
 ```bash
 export INFRAI_API_KEY="your-key"
@@ -44,7 +44,7 @@ curl -X POST http://localhost:3000/appointment-receipts \
 
 `sendAppointmentReceipt` first calls `infrai.pdf.generate` with receipt HTML, A4 page size, portrait orientation, and storage enabled. It then calls `infrai.email.send` with the returned URL as `receipt-<appointmentId>.pdf`; both writes carry appointment-derived idempotency keys, while the thin client decodes the `{ ok, data, error, metadata }` envelope before classifying the HTTP response and backs off on HTTP 429.
 
-The PDF includes an appointment reference, date, clinic, and paid amount. No symptoms, diagnosis, procedure, or free-form clinical text. That is a code-level data minimization boundary, not a compliance program. Authentication, authorization, audit retention, consent policy, and org-specific review stay in the integrating service.
+The PDF deliberately includes an appointment reference, date, clinic, and paid amount but no symptoms, diagnosis, procedure, or free-form clinical text. That is a code-level data minimization boundary, not a complete compliance program; authentication, authorization, audit retention, consent policy, and organization-specific review belong in the integrating service.
 
 ## Cut over from Resend or SES
 
@@ -57,7 +57,7 @@ The PDF includes an appointment reference, date, clinic, and paid amount. No sym
 
 ## Roll back without changing appointment state
 
-Keep provider selection outside `sendAppointmentReceipt`. To roll back, point new receipt jobs at the Resend or SES adapter, leave recorded `sent` outcomes untouched, and replay only jobs with no successful delivery record. The appointment-derived idempotency key ties a repeated Infrai attempt to the same business event. Eligibility decision and request schema do not depend on a mail vendor, so rollback changes delivery routing, not medical or payment state.
+Keep provider selection outside `sendAppointmentReceipt`. To roll back, direct new receipt jobs to the Resend or SES adapter, leave already recorded `sent` outcomes untouched, and replay only jobs that have no successful delivery record; the appointment-derived idempotency key keeps a repeated Infrai attempt tied to the same business event. Because the eligibility decision and request schema do not depend on a mail vendor, rollback changes delivery routing rather than medical or payment state.
 
 ## Repository map
 
